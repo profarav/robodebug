@@ -237,3 +237,27 @@
 .confTrack { flex: 1; height: 4px; background: rgba(255,255,255,0.1); border-radius: 2px; overflow: hidden; }
 .confFill { height: 100%; background: linear-gradient(90deg, #00d4aa, #0099ff); border-radius: 2px; transition: width 1s ease; }
 .confPct { font-size: 11px; color: var(--accent); font-weight: 600; font-family: 'JetBrains Mono', monospace; }
+
+/* Source code viewer */
+.fileName {
+  color: var(--accent);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 500;
+}
+.sourceBlock {
+  background: rgba(0,0,0,0.35);
+  border: 1px solid rgba(255,255,255,0.07);
+  border-left: 2px solid var(--accent);
+  border-radius: 4px;
+  padding: 12px 14px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: #c8d4e8;
+  white-space: pre;
+  overflow-x: auto;
+  line-height: 1.7;
+  margin: 0;
+}

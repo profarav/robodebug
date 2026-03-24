@@ -21,11 +21,86 @@ const MOCK_CONTEXT = {
 };
 
 const SAMPLE_LOGS = [
-  { id: 'e1', level: 'ERROR', msg: "TF lookup failed: /base_link → /map", full: "tf2.LookupException: 'base_link' passed to lookupTransform argument target_frame does not exist." },
-  { id: 'w1', level: 'WARN', msg: 'IMU latency 340ms above threshold', full: '[apollo/imu_node] Sensor latency 340ms exceeds threshold of 100ms. Check USB connection or reduce publish rate.' },
-  { id: 'e2', level: 'ERROR', msg: 'Costmap update timeout after 5.0s', full: '[nav2_costmap_2d] Costmap update loop missed its desired rate of 5.0Hz. Sensor data timeout exceeded.' },
-  { id: 'i1', level: 'INFO', msg: 'Goal received: position (2.4, 1.1, 0.0)', full: '[navigation_controller] New goal received. Planning path to (2.4, 1.1, 0.0).' },
-  { id: 'i2', level: 'INFO', msg: 'Navigation stack initialized', full: '[navigation_controller] All systems nominal. Nav stack ready.' },
+  {
+    id: 'e1', level: 'ERROR', msg: "TF lookup failed: /base_link → /map",
+    full: "tf2.LookupException: 'base_link' passed to lookupTransform argument target_frame does not exist.",
+    file: 'navigation_controller.py',
+    code: `def get_robot_pose(self):
+    try:
+        transform = self.tf_buffer.lookup_transform(
+            'map',
+            'base_link',
+            rclpy.time.Time(),
+            timeout=rclpy.duration.Duration(seconds=0.1)
+        )
+        return transform
+    except tf2_ros.LookupException as e:
+        self.get_logger().error(f'TF lookup failed: {e}')
+        return None`,
+  },
+  {
+    id: 'w1', level: 'WARN', msg: 'IMU latency 340ms above threshold',
+    full: '[apollo/imu_node] Sensor latency 340ms exceeds threshold of 100ms. Check USB connection or reduce publish rate.',
+    file: 'imu_node.py',
+    code: `def __init__(self):
+    super().__init__('imu_node')
+    self.publisher = self.create_publisher(Imu, '/imu/data', 10)
+    self.timer = self.create_timer(0.34, self.publish_imu)
+    self.serial_port = serial.Serial('/dev/ttyUSB0', 9600)
+
+def publish_imu(self):
+    data = self.serial_port.readline()
+    msg = self.parse_imu(data)
+    self.publisher.publish(msg)`,
+  },
+  {
+    id: 'e2', level: 'ERROR', msg: 'Costmap update timeout after 5.0s',
+    full: '[nav2_costmap_2d] Costmap update loop missed its desired rate of 5.0Hz. Sensor data timeout exceeded.',
+    file: 'nav2_params.yaml',
+    code: `local_costmap:
+  local_costmap:
+    ros__parameters:
+      update_frequency: 5.0
+      publish_frequency: 2.0
+      observation_sources: scan
+      scan:
+        topic: /scan
+        data_type: "LaserScan"
+        marking: True
+        clearing: True
+        obstacle_max_range: 2.5`,
+  },
+  {
+    id: 'i1', level: 'INFO', msg: 'Goal received: position (2.4, 1.1, 0.0)',
+    full: '[navigation_controller] New goal received. Planning path to (2.4, 1.1, 0.0).',
+    file: 'navigation_controller.py',
+    code: `def goal_pose_callback(self, msg):
+    goal_pose = PoseStamped()
+    goal_pose.header.frame_id = 'map'
+    goal_pose.header.stamp = self.get_clock().now().to_msg()
+    goal_pose.pose = msg.pose
+    self.get_logger().info(
+        f'New goal received. Planning path to '
+        f'({msg.pose.position.x:.1f}, {msg.pose.position.y:.1f}, '
+        f'{msg.pose.position.z:.1f}).'
+    )
+    self.nav_client.send_goal_async(goal_pose)`,
+  },
+  {
+    id: 'i2', level: 'INFO', msg: 'Navigation stack initialized',
+    full: '[navigation_controller] All systems nominal. Nav stack ready.',
+    file: 'navigation_controller.py',
+    code: `def __init__(self):
+    super().__init__('navigation_controller')
+    self.nav_client = ActionClient(
+        self, NavigateToPose, 'navigate_to_pose'
+    )
+    self.tf_buffer = tf2_ros.Buffer()
+    self.tf_listener = tf2_ros.TransformListener(
+        self.tf_buffer, self
+    )
+    self.get_logger().info('All systems nominal. Nav stack ready.')`,
+  },
 ];
 
 export default function Home() {
@@ -40,10 +115,12 @@ export default function Home() {
     setResult(null);
     const errorText = useCustom ? customError : selectedLog.full;
     try {
+      const code = useCustom ? undefined : selectedLog.code;
+      const file = useCustom ? undefined : selectedLog.file;
       const res = await fetch('/api/analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ errorText, context: MOCK_CONTEXT }),
+        body: JSON.stringify({ errorText, context: MOCK_CONTEXT, code, file }),
       });
       const data = await res.json();
       setResult(data);
@@ -121,6 +198,15 @@ export default function Home() {
               ))}
             </div>
           </section>
+
+          {!useCustom && (
+            <section className={styles.section}>
+              <div className={styles.sectionTitle}>
+                Source — <span className={styles.fileName}>{selectedLog.file}</span>
+              </div>
+              <pre className={styles.sourceBlock}>{selectedLog.code}</pre>
+            </section>
+          )}
 
           <section className={styles.section}>
             <div className={styles.sectionTitle}>Or paste your own error</div>

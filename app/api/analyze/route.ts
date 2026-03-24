@@ -4,7 +4,7 @@ import { NextRequest, NextResponse } from 'next/server';
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
 export async function POST(req: NextRequest) {
-  const { errorText, context } = await req.json();
+  const { errorText, context, code, file } = await req.json();
 
   const dead = context.nodes.filter((n: any) => n.status === 'dead').map((n: any) => n.name);
   const slow = context.nodes.filter((n: any) => n.status === 'slow').map((n: any) => n.name);
@@ -13,9 +13,9 @@ export async function POST(req: NextRequest) {
 
   const prompt = `You are a ROS robotics expert debugging assistant. Analyze this error given the live robot state.
 
-ERROR / CODE:
+ERROR:
 ${errorText}
-
+${code ? `\nSOURCE CODE (${file ?? 'unknown file'}):\n${code}\n` : ''}
 LIVE ROS CONTEXT:
 - ROS Version: ${context.rosVersion}
 - Active nodes: ${active.join(', ')}
